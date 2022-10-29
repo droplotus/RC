@@ -33,14 +33,16 @@ void llopen(int fd){
         int bytes = read(fd, buf, BUF_SIZE);
         buf[bytes] = '\0'; // Set end of string to '\0', so we can printf
 
-        if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03 && buf[3] == 0x03^0x03 && buf[4] == 0x7E)
+        //if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03 && buf[3] == 0x03^0x03 && buf[4] == 0x7E)
+        if(buf[0] == 0x7E)
             printf("Connection established.\n");
-            
+        
+        bytes = write(fd, buf, 1);
 
         buf[2] = 0x07;
         
         sleep(1);
-        bytes = write(fd, buf, BUF_SIZE);
+        //bytes = write(fd, buf, BUF_SIZE);
         printf("%d bytes written\n", bytes);
         //printf("BCC1: %d\n", buf[3]);
 

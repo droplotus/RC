@@ -29,11 +29,115 @@
 #define DISC 0x0B
 #define UA 0x07
 
+typedef enum {TRANSMITTER, RECEIVER}Job;
 
-volatile int STOP = FALSE;
+typedef enum {
 
+	START,
+	FLAG_RCV,
+	A_RCV,
+	C_RCV,
+	BCC_OK,
+	STOP
 
-int llopen(int fd){
+}State;
+
+//volatile int STOP = FALSE;
+
+int llopen(int porta, Job j){
+
+	//fsync(porta);
+
+	// Create string to send
+  unsigned char writing[1] = {0};
+  unsigned char reading[1] = {0};
+  
+  //buf[0] = FLAG;
+  //buf[1] = A;
+  //buf[2] = C;
+  //buf[3] = A^C;
+  //buf[4] = FLAG;
+  
+  int bytes;
+  
+	if(j == TRANSMITTER){
+		printf("Entering transmitter work.\n");
+		
+		State s = START;
+		printf("Starting...\n");
+		while(1){
+		
+			switch (s) {
+				case START:
+					writing[0] = FLAG;
+					bytes = write(porta, writing, 1);
+					sleep(1);
+					bytes = read(porta, reading, 1);
+					//printf("%d", bytes);
+					if(reading[0] == FLAG){
+						s = FLAG_RCV;
+						printf("FLAG_RCV\n");
+					}
+					break;
+				case FLAG_RCV:
+					writing[0] = A;
+					bytes = write(porta, writing, 1);
+					sleep(1);
+					bytes = read(porta, reading, 1);
+					if(reading[0] == A){
+						s = A_RCV;
+						printf("A_RCV\n");
+					}
+					break;
+				case A_RCV:
+					writing[0] = C;
+					bytes = write(porta, writing, 1);
+					sleep(1);
+					bytes = read(porta, reading, 1);
+					if(reading[0] == UA){
+						s = C_RCV;
+						printf("C_RCV\n");
+					}
+					break;
+				case C_RCV:
+					writing[0] = A^C;
+					bytes = write(porta, writing, 1);
+					sleep(1);
+					bytes = read(porta, reading, 1);
+					if(reading[0] == A^C) {
+						s = BCC_OK;
+						printf("BCC_OK\n");
+					}
+					break;
+				case BCC_OK:
+					writing[0] = FLAG;
+					bytes = write(porta, writing, 1);
+					sleep(1);
+					bytes = read(porta, reading, 1);
+					if(reading[0] == FLAG) {
+						s = STOP;
+						printf("STOP\n");
+					}
+					break;
+				case STOP:
+					break;
+				default:
+					break;
+			}
+			if (s==STOP) break;
+		}
+		printf("Stopping...\n");
+		
+  }else {
+    printf("Entering receiver work.\n");
+    while(1){
+			
+		}
+  }
+  return porta;
+}
+
+int lllopen(int fd){
     // Create string to send
     unsigned char buf[255] = {0};
 
@@ -60,8 +164,8 @@ int llopen(int fd){
 
     // Start receiving confirmation 
 
-    //fflush(fd);
-
+   
+		//fflush(fd);
     
     // Loop for input
     //unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
@@ -255,6 +359,7 @@ int main(int argc, char *argv[])
     // because we don't want to get killed if linenoise sends CTRL-C.
     int fd = open(serialPortName, O_RDWR | O_NOCTTY);
 
+
     if (fd < 0)
     {
         perror(serialPortName);
@@ -302,7 +407,9 @@ int main(int argc, char *argv[])
 
     printf("New termios structure set\n");
 
-    llopen(fd);
+    llopen(fd, TRANSMITTER);
+
+	return 0;
 
     llwrite(fd);
 
