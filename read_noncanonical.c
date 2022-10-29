@@ -21,94 +21,35 @@
 
 #define BUF_SIZE 256
 
-volatile int STOP = FALSE;
+// Defining flags and stuff
+#define FLAG 0x7E
+#define A 0x03
+#define C 0x03
+#define DISC 0x0B
+#define UA 0x07
 
-void llopen(int fd){
-    // Loop for input
-    unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+struct termios oldtio;
+struct termios newtio;
 
-    while (STOP == FALSE)
+typedef enum {TRANSMITTER, RECEIVER}Job;
+
+typedef enum {
+
+	START,
+	FLAG_RCV,
+	A_RCV,
+	C_RCV,
+	BCC_OK,
+	STOP
+
+}State;
+
+void setup(int fd, const char *porta) {
+	if (fd < 0)
     {
-        // Returns after 5 chars have been input
-        int bytes = read(fd, buf, BUF_SIZE);
-        buf[bytes] = '\0'; // Set end of string to '\0', so we can printf
-
-        //if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03 && buf[3] == 0x03^0x03 && buf[4] == 0x7E)
-        if(buf[0] == 0x7E)
-            printf("Connection established.\n");
-        
-        bytes = write(fd, buf, 1);
-
-        buf[2] = 0x07;
-        
-        sleep(1);
-        //bytes = write(fd, buf, BUF_SIZE);
-        printf("%d bytes written\n", bytes);
-        //printf("BCC1: %d\n", buf[3]);
-
-        // Wait until all bytes have been written to the serial port
-        sleep(1);
-        break;
-    }
-    
-}
-
-void llread(int fd){
-    int aux = 0;
-    
-    unsigned char buffer[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-    
-    while (STOP == FALSE)
-    {
-        sleep(3);
-        // Returns after 5 chars have been input
-        int bytes = read(fd, buffer, BUF_SIZE);
-        buffer[bytes] = '\0'; // Set end of string to '\0', so we can printf
-
-        //if(buffer[0] == 0x7E && buffer[1] == 0x03 && buffer[2] == 0x40 && buffer[3] == 0x03^0x40 && buffer[5] == 0x03^0x40 && buffer[6] == 0x7E)
-        printf("Coisinho a pegar: %d.\n", buffer[4]);
-            
-
-        //buf[2] = 0x07;
-        
-        //bytes = write(fd, buf, BUF_SIZE);
-        //printf("%d bytes written\n", bytes);
-        //printf("BCC1: %d\n", buf[3]);
-
-        // Wait until all bytes have been written to the serial port
-        // sleep(1);
-        break;
-    }
-}
-
-int main(int argc, char *argv[])
-{
-    // Program usage: Uses either COM1 or COM2
-    const char *serialPortName = argv[1];
-    
-    char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
-
-    if (argc < 2)
-    {
-        printf("Incorrect program usage\n"
-               "Usage: %s <SerialPort>\n"
-               "Example: %s /dev/ttyS1\n",
-               argv[0],
-               argv[0]);
-        exit(1);
-    }
-
-    // Open serial port device for reading and writing and not as controlling tty
-    // because we don't want to get killed if linenoise sends CTRL-C.
-    int fd = open(serialPortName, O_RDWR | O_NOCTTY);
-    if (fd < 0)
-    {
-        perror(serialPortName);
+        perror(porta);
         exit(-1);
     }
-
-    struct termios oldtio;
-    struct termios newtio;
 
     // Save current port settings
     if (tcgetattr(fd, &oldtio) == -1)
@@ -145,15 +86,234 @@ int main(int argc, char *argv[])
         perror("tcsetattr");
         exit(-1);
     }
+}
 
+
+int llopen(const char *porta, Job j){
+
+	//fsync(porta);
+	int fd = open(porta, O_RDWR | O_NOCTTY);
+	setup(fd, porta);
+	// Create string to send
+  unsigned char writing[1] = {0};
+  unsigned char reading[1] = {0};
+  
+  int bytes;
+  
+	if(j == TRANSMITTER){
+		printf("Entering transmitter work.\n");
+		while(1){
+		
+		}
+		
+		
+  }else {
+    printf("Entering receiver work.\n");
+    State s = START;
+		printf("Starting...\n");
+		while(1){
+		
+			switch (s) {
+				case START:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == FLAG){
+						s = FLAG_RCV;
+						//printf("FLAG_RCV\n");
+						writing[0] = FLAG;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case FLAG_RCV:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == A){
+						s = A_RCV;
+						//printf("A_RCV\n");
+						writing[0] = A;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case A_RCV:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == C){
+						s = C_RCV;
+						//printf("C_RCV\n");
+						writing[0] = UA;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case C_RCV:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == A^C){
+						s = BCC_OK;
+						//printf("BCC_OK\n");
+						writing[0] = A^C;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case BCC_OK:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == FLAG){
+						s = STOP;
+						//printf("STOP\n");
+						writing[0] = FLAG;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case STOP:
+					break;
+				default:
+					break;
+			}
+			if (s==STOP) break;
+		}
+		printf("llopen success: Stopping...\n");
+  }
+  return fd;
+}
+
+int llclose(int fd, Job j){
+  unsigned char writing[1] = {0};
+  unsigned char reading[1] = {0};
+  
+  int bytes;
+  
+	if(j == TRANSMITTER){
+		printf("Entering transmitter work.\n");
+		while(1){
+		
+		}
+		
+		
+  }else {
+    printf("Entering receiver work.\n");
+    State s = START;
+		printf("Starting...\n");
+		while(1){
+		
+			switch (s) {
+				case START:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == FLAG){
+						s = FLAG_RCV;
+						//printf("FLAG_RCV\n");
+						writing[0] = FLAG;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case FLAG_RCV:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == A){
+						s = A_RCV;
+						//printf("A_RCV\n");
+						writing[0] = A;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case A_RCV:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == DISC){
+						writing[0] = DISC;
+						bytes = write(fd, writing, 1);
+						sleep(1);
+						bytes = read(fd, reading, 1);
+						if(reading[0] == UA){
+							s = C_RCV;
+							//printf("C_RCV\n");
+						}
+					}
+					//sleep(1);
+					break;
+				case C_RCV:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == A^C){
+						s = BCC_OK;
+						//printf("BCC_OK\n");
+						writing[0] = A^C;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case BCC_OK:
+					bytes = read(fd, reading, 1);
+					if(reading[0] == FLAG){
+						s = STOP;
+						//printf("STOP\n");
+						writing[0] = FLAG;
+						bytes = write(fd, writing, 1);
+					}
+					//sleep(1);
+					break;
+				case STOP:
+					break;
+				default:
+					break;
+			}
+			if (s==STOP) break;
+		}
+		printf("llclose success: Stopping...\n");
+  }
+  return 0;
+}
+
+void llread(int fd){
+    int aux = 0;
+    
+    unsigned char buffer[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+    
+    while (STOP == FALSE)
+    {
+        sleep(3);
+        // Returns after 5 chars have been input
+        int bytes = read(fd, buffer, BUF_SIZE);
+        buffer[bytes] = '\0'; // Set end of string to '\0', so we can printf
+
+        //if(buffer[0] == 0x7E && buffer[1] == 0x03 && buffer[2] == 0x40 && buffer[3] == 0x03^0x40 && buffer[5] == 0x03^0x40 && buffer[6] == 0x7E)
+        printf("Coisinho a pegar: %d.\n", buffer[4]);
+            
+
+        //buf[2] = 0x07;
+        
+        //bytes = write(fd, buf, BUF_SIZE);
+        //printf("%d bytes written\n", bytes);
+        //printf("BCC1: %d\n", buf[3]);
+
+        // Wait until all bytes have been written to the serial port
+        // sleep(1);
+        break;
+    }
+}
+
+int main(int argc, char *argv[])
+{
+
+    if (argc < 2)
+    {
+        printf("Incorrect program usage\n"
+               "Usage: %s <SerialPort>\n"
+               "Example: %s /dev/ttyS1\n",
+               argv[0],
+               argv[0]);
+        exit(1);
+    }
+
+    // Open serial port device for reading and writing, and not as controlling tty
+    // because we don't want to get killed if linenoise sends CTRL-C.
+    
+    
     printf("New termios structure set\n");
+    int fd = llopen(argv[1], RECEIVER);
 
-    llopen(fd);
+		if(llclose(fd, RECEIVER) == 0){
+    	printf("llclosing......\n");
+    }
 
-    llread(fd);
-
-    // The while() cycle should be changed in order to respect the specifications
-    // of the protocol indicated in the Lab guide
 
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
@@ -164,5 +324,9 @@ int main(int argc, char *argv[])
 
     close(fd);
 
-    return 0;
+
+	return 0;
 }
+
+
+
