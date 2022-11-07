@@ -161,15 +161,15 @@ int openTransmitter() {
 
 int closeTransmitter() {
     setStatee(START);
-    unsigned char *buf = (unsigned char *)malloc(5);
+    //unsigned char *buf = (unsigned char *)malloc(5);
 
     alarmCount = 0;
     int receivedDISC = 0;
 
-    //printf("Inside closeTransmitter\n");
+    printf("Inside closeTransmitter\n");
 
     while(alarmCount < ll.nRetransmissions){
-        //printf("Inside closeTransmitter -> while\n");
+        printf("Inside closeTransmitter -> while\n");
         alarm(ll.timeout);
         alarmEnabled = TRUE;
 
@@ -179,22 +179,22 @@ int closeTransmitter() {
             printf("Alarm Count = %d\n", alarmCount);
         }
 
-        buf[0] = FLAG;
-        buf[1] = A;
-        buf[2] = DISC;
-        buf[3] = (A^DISC);
-        buf[4] = FLAG;
-        write(fd, buf, 5);
+        buffer[0] = FLAG;
+        buffer[1] = A;
+        buffer[2] = DISC;
+        buffer[3] = (A^DISC);
+        buffer[4] = FLAG;
+        write(fd, buffer, 5);
 
         while(alarmEnabled && !receivedDISC){
-
-            int bytes = read(fd, buf, 5);
+            printf("Inside closeTransmitter -> while -> while\n");
+            int bytes = read(fd, buffer, 5);
 
             if(bytes < 0) return -1;
 
             for (int i = 0; i<bytes; i++){
-                //printf("State: %d\n", getState());
-                handleMsgByte(buf[i]);
+                printf("State: %d\n", getState());
+                handleMsgByte(buffer[i]);
             }
 
             if(getC() == DISC) receivedDISC = 1;
@@ -202,12 +202,12 @@ int closeTransmitter() {
         }
 
         if(receivedDISC){
-            buf[0] = FLAG;
-            buf[1] = A;
-            buf[2] = UA;
-            buf[3] = (A^UA);
-            buf[4] = FLAG;
-            write(fd, buf, 5);
+            buffer[0] = FLAG;
+            buffer[1] = A;
+            buffer[2] = UA;
+            buffer[3] = (A^UA);
+            buffer[4] = FLAG;
+            write(fd, buffer, 5);
             printf("(CLOSE) Tudo perfeito do transmissor.\n");
             break;
         }
@@ -245,12 +245,15 @@ int openReceiver() {
 
 int closeReceiver() {
     setStatee(START);
-    unsigned char *buf = (unsigned char *)malloc(5);
+    //unsigned char *buf = (unsigned char *)malloc(5);
     alarmCount = 0;
     int receivedDISC = 0;
     int receivedUA = 0;
 
+    printf("Inside closeReceiver\n");
+
     while(alarmCount < ll.nRetransmissions){
+        printf("Inside closeReceiver -> while\n");
         alarm(ll.timeout);
         alarmEnabled = TRUE;
 
@@ -261,33 +264,34 @@ int closeReceiver() {
         }
 
         while(alarmEnabled && !receivedDISC){
-            int bytes = read(fd, buf, 5);
-
+            printf("Inside closeReceiver -> while -> while\n");
+            int bytes = read(fd, buffer, 5);
+            printf("Inside closeReceiver -> while -> while -> bytes\n");
             if(bytes < 0) return -1;
 
             for (int i = 0; i<bytes; i++){
-                handleMsgByte(buf[i]);
+                handleMsgByte(buffer[i]);
             }
 
             if(getC() == DISC) receivedDISC = 1;
             
         }
 
-        buf[0] = FLAG;
-        buf[1] = A;
-        buf[2] = DISC;
-        buf[3] = (A^DISC);
-        buf[4] = FLAG;
-        write(fd, buf, 5);
+        buffer[0] = FLAG;
+        buffer[1] = A;
+        buffer[2] = DISC;
+        buffer[3] = (A^DISC);
+        buffer[4] = FLAG;
+        write(fd, buffer, 5);
         
         while(!receivedUA){
             setStatee(START);
-            int bytes = read(fd, buf, 5);
+            int bytes = read(fd, buffer, 5);
 
             if(bytes < 0) return -1;
 
             for (int i = 0; i<bytes; i++){
-                handleMsgByte(buf[i]);
+                handleMsgByte(buffer[i]);
             }
             
             if(getC() == UA) receivedUA = 1;
@@ -452,6 +456,7 @@ int llread()
             fprintf(fileptr, "%c", bufferr[i]);
             
         
+        memset(bufferr,0,sizeof(bufferr));
         if(bytes < 1000) break;
         //buf[2] = 0x07;
         
@@ -462,8 +467,6 @@ int llread()
         // Wait until all bytes have been written to the serial port
         // sleep(1);
     }
-
-    
 
     fclose(fileptr);
 
