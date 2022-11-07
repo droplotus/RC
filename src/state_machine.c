@@ -69,17 +69,6 @@ static void handleFlagReceived(byte msg_byte) {
 
 static void handleAReceived(byte msg_byte) {
 
-	#define FLAG 0x7E
-	#define A 0x03
-	#define C 0x03
-	#define SET 0x03
-	#define DISC 0x0B
-	#define UA 0x07
-	#define RR_0 0x85 
-	#define RR_1 0x05
-	#define REJ_0 0x81
-	#define REJ_1 0x01
-
     switch (msg_byte) {
         case FLAG:
             setState(FLAG_RCV);
