@@ -53,7 +53,8 @@ int openReceiver();
 int closeTransmitter();
 int closeReceiver();
 
-void sendPacket(unsigned char *buf, int filelen);
+unsigned char *createInformationFrame(unsigned char *buf, int filelen, int size);
+void sendPacket(unsigned char *buf, int size);
 void sendFile(const char *filename);
 
 void restore();

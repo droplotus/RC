@@ -23,6 +23,8 @@ static struct termios oldtio;
 struct termios newtio;
 
 static int fd;
+static int rest;
+static long len;
 unsigned char buffer[5];
 clock_t start, end;
 
@@ -301,9 +303,42 @@ int closeReceiver() {
     return 1;
 }
 
-void sendPacket(unsigned char *buf, int filelen) {
+unsigned char *getData(unsigned char *buf, int size){
+    unsigned char *buff = (unsigned char *)malloc(size * sizeof(char));
+
+    for(int i=4; i<size+5; i++){
+        buff[i-4] = buf[i];
+    }
+
+    printf("%li\n", sizeof(buff));
+    return buff;
+}
+
+unsigned char *createInformationFrame(unsigned char *buf, int filelen, int size){
+    unsigned char *buff = (unsigned char *)malloc((size+6) * sizeof(char));
+
+    buff[0] = FLAG;
+    buff[1] = A;
+    buff[2] = C;
+    buff[3] = (A^C);
+    buff[size+5] = (A^C);
+    buff[size+6] = FLAG;
+
+    for(int i=4; i<size+5; i++){
+        buff[i] = buf[i-4];
+    }
+
     
-    write(fd, buf, filelen);
+
+    //printf("size: %i, Inicio: Compare buff: %d, buf: %d\n", size, buff[size+4], buf[size]);
+    //printf("size: %i, Fim: Compare buff: %d, buf: %d\n", size, buff[size+3], buf[size-1]);
+
+    return buff;
+}
+
+void sendPacket(unsigned char *buf, int size) {
+    //buf = createInformationFrame(buf, filelen, size);
+    write(fd, buf, size);
 
 }
 
@@ -323,9 +358,13 @@ void sendFile(const char *filename) {
 
     printf("%li\n", filelen);
 
+    len = filelen;
+
     buf = (unsigned char *)malloc(filelen * sizeof(char));
     fread(buf, filelen, 1, fileptr); // Read in the entire file
     fclose(fileptr); // Close the file
+
+    rest = filelen%1000;
 
     while(filelen > 0) {
         printf("file size: %ld\n", filelen);
@@ -335,7 +374,7 @@ void sendFile(const char *filename) {
                 send[i] = buf[i+index*1000];
             }
 
-            sendPacket(send, filelen);
+            sendPacket(send, 1000);
             index++;
             filelen -= 1000;
         }
@@ -344,7 +383,6 @@ void sendFile(const char *filename) {
             for(int i=0; i<filelen; i++){
                 send[i] = buf[i+index*1000];
             }
-            send[filelen] = '\0';
             sendPacket(send, filelen);
             filelen = 0;
             printf("finished sending file\n");
@@ -386,8 +424,12 @@ int llread()
 {
     // int aux = 0;
     
-    unsigned char buf[1000] = {0}; // +1: Save space for the final '\0' char
-    
+    //unsigned char *buf;
+    //unsigned char *buff;
+
+    unsigned char bufferr[1000] = {0};
+    //unsigned char bufferrest[rest] = {0};
+
     FILE *fileptr;
     // int mode = O_WRONLY | O_APPEND | O_CREAT;
     fileptr = fopen("newpinguim.gif", "a+");
@@ -395,13 +437,19 @@ int llread()
 
     while (TRUE)
     {
-        //sleep(3);
+        //buf = (unsigned char *)malloc((b+7) * sizeof(char)); // +1: Save space for the final '\0' char
+
         // Returns after 5 chars have been input
-        int bytes = read(fd, buf, 1000);
-        //printf("%d", bytes);
+        int bytes = read(fd, bufferr, 1000);
+        printf("bytes: %d\n", bytes);
+
+        //buff = getData(buf, b);
+        //printf("DEBUG: %d : %d\n", buff[b-1], buf[bytes-4]);
+
         //if(buffer[0] == 0x7E && buffer[1] == 0x03 && buffer[2] == 0x40 && buffer[3] == 0x03^0x40 && buffer[5] == 0x03^0x40 && buffer[6] == 0x7E)
+        
         for(int i=0; i<bytes; i++)
-            fprintf(fileptr, "%c", buf[i]);
+            fprintf(fileptr, "%c", bufferr[i]);
             
         
         if(bytes < 1000) break;
@@ -413,10 +461,13 @@ int llread()
 
         // Wait until all bytes have been written to the serial port
         // sleep(1);
-
     }
 
+    
+
     fclose(fileptr);
+
+    printf("Returning llread\n");
 
     return 1;
 }

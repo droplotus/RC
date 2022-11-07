@@ -47,6 +47,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(1);
     }
 
+    printf("Returned\n");
+
     if(!llclose(1)){
         printf("Error: llclose\n");
         exit(1);

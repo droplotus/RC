@@ -9,8 +9,10 @@
 #define SET 0x03
 #define DISC 0x0B
 #define UA 0x07
-#define RR_0 0x85 
-#define RR_1 0x05
+#define I1 0x40
+#define I0 0x00
+#define RR1 0x85
+#define RR0 0x05
 #define REJ_0 0x81
 #define REJ_1 0x01
 
