@@ -49,6 +49,9 @@ int llclose(int showStatistics);
 
 int openTransmitter();
 int openReceiver();
-void setup(char *serialPort, int baudRate, int timeout);
+int closeTransmitter();
+int closeReceiver();
+
+void restore();
 
 #endif // _LINK_LAYER_H_

@@ -87,7 +87,7 @@ void handleMsgByte(byte msg_byte);
 //void resetMsgState();
 
 
-
+void setStatee(state_t new_state);
 void setC();
 byte getC();
 

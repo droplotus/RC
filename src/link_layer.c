@@ -148,8 +148,59 @@ int openTransmitter() {
             
         }
         if(getState() == STOP){
-                printf("Tudo perfeito do transmissor.\n");
+                printf("(OPEN) Tudo perfeito do transmissor.\n");
                 break;
+        }
+    }
+
+
+    return 1;
+}
+
+int closeTransmitter() {
+    setStatee(START);
+    unsigned char buf[5];
+    alarmCount = 0;
+    int receivedDISC = 0;
+
+    while(alarmCount < ll.nRetransmissions){
+        alarm(ll.timeout);
+        alarmEnabled = TRUE;
+
+        if (alarmCount > 0)
+        {
+            alarmCount++;
+            printf("Alarm Count = %d\n", alarmCount);
+        }
+
+        buf[0] = FLAG;
+        buf[1] = A;
+        buf[2] = DISC;
+        buf[3] = (A^DISC);
+        buf[4] = FLAG;
+        write(fd, buf, 5);
+        
+        while(alarmEnabled && !receivedDISC){
+            int bytes = read(fd, buf, 5);
+            if(bytes < 0) return -1;
+
+            for (int i = 0; i<bytes; i++){
+                handleMsgByte(buf[i]);
+            }
+
+            if(getC() == DISC) receivedDISC = 1;
+            
+        }
+
+        if(receivedDISC){
+            buf[0] = FLAG;
+            buf[1] = A;
+            buf[2] = UA;
+            buf[3] = (A^UA);
+            buf[4] = FLAG;
+            write(fd, buf, 5);
+            printf("(CLOSE) Tudo perfeito do transmissor.\n");
+            break;
         }
     }
 
@@ -168,7 +219,7 @@ int openReceiver() {
         }
 
         if(getState() == STOP){
-            printf("Tudo perfeito do recetor.\n");
+            printf("(OPEN) Tudo perfeito do recetor.\n");
             break;
         }
     }
@@ -179,6 +230,67 @@ int openReceiver() {
     buffer[3] = (A^UA);
     buffer[4] = FLAG;
     write(fd, buffer, 5);
+
+    return 1;
+}
+
+int closeReceiver() {
+    setStatee(START);
+    unsigned char buf[5];
+    alarmCount = 0;
+    int receivedDISC = 0;
+    int receivedUA = 0;
+
+    while(alarmCount < ll.nRetransmissions){
+        alarm(ll.timeout);
+        alarmEnabled = TRUE;
+
+        if (alarmCount > 0)
+        {
+            alarmCount++;
+            printf("Alarm Count = %d\n", alarmCount);
+        }
+
+        while(alarmEnabled && !receivedDISC){
+            int bytes = read(fd, buf, 5);
+
+            if(bytes < 0) return -1;
+
+            for (int i = 0; i<bytes; i++){
+
+                handleMsgByte(buf[i]);
+            }
+
+            if(getC() == DISC) receivedDISC = 1;
+            
+        }
+
+        buf[0] = FLAG;
+        buf[1] = A;
+        buf[2] = DISC;
+        buf[3] = (A^DISC);
+        buf[4] = FLAG;
+        write(fd, buf, 5);
+        
+        while(!receivedUA){
+            setStatee(START);
+            int bytes = read(fd, buf, 5);
+
+            if(bytes < 0) return -1;
+
+            for (int i = 0; i<bytes; i++){
+                handleMsgByte(buf[i]);
+            }
+            
+            if(getC() == UA) receivedUA = 1;
+        }
+
+        if(receivedUA){
+            printf("(CLOSE) Tudo perfeito do recetor.\n");
+            break;
+        }
+    }
+
 
     return 1;
 }
@@ -203,12 +315,43 @@ int llread(unsigned char *packet)
     return 0;
 }
 
+void restore(){
+    // Restore the old port settings
+    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+    {
+        perror("tcsetattr");
+        exit(-1);
+    }
+}
+
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-    // TODO
+    switch(ll.role){
+        case LlTx:
+            {
+                if(!closeTransmitter()){
+                    printf("Error: openTransmitter\n");
+                    exit(1);
+                }
+                restore();
+                return 1;
+            }
+        case LlRx:
+            {
+                if(!closeReceiver()){
+                    printf("Error: openReceiver\n");
+                    exit(1);
+                }
+                restore();
+                return 1;
+            }
+        default:
+            return 0;
+
+    }
 
     return 1;
 }

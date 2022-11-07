@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <stdio.h>
 #include "state_machine.h"
 
 static void setState(state_t new_state);
@@ -74,15 +75,14 @@ static void handleAReceived(byte msg_byte) {
             setState(FLAG_RCV);
             break;
         case DISC:
-        case SET: 
+            setState(C_RCV);
+            state_machine.ctrl = msg_byte;
+            break;
         case UA:
             setState(C_RCV);
             state_machine.ctrl = msg_byte;
             break;
-        case RR_0:
-        case RR_1:
-        case REJ_0:
-        case REJ_1:
+        case C:
             setState(C_RCV);
             state_machine.ctrl = msg_byte;
             break;
@@ -98,7 +98,7 @@ static void handleCReceived(byte msg_byte) {
             setState(FLAG_RCV);
             break;
         default:
-            if(msg_byte == (A^C) || msg_byte == (A^UA)) {
+            if(msg_byte == (A^C) || msg_byte == (A^UA) || msg_byte == (A^DISC)) {
                 setState(BCC_OK);
             } else {
                 setState(START);
@@ -120,4 +120,8 @@ static void handleBccOk(byte msg_byte) {
 
 static void setState(state_t new_state) {
     state_machine.current_state = new_state;
+}
+
+void setStatee(state_t new_state) {
+    setState(new_state);
 }
