@@ -1,12 +1,18 @@
 // Main file of the serial port project.
 // NOTE: This file must not be changed.
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include "application_layer.h"
 
-#define BAUDRATE 9600
+#define BAUDRATE B9600 // ver pq não dá para usar apenas 9600
 #define N_TRIES 3
 #define TIMEOUT 4
 

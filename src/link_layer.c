@@ -1,18 +1,64 @@
 // Link layer protocol implementation
 
 #include "link_layer.h"
+#include "state_machine.h"
+
 #include <termios.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <time.h>
+#include <signal.h>
+
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-static int fd;
 
 static struct termios oldtio;
+struct termios newtio;
 
-void setup(int baudrate, int timeout) {
+static int fd;
+unsigned char buffer[5];
+clock_t start, end;
 
-    // Save current port settings
+// Alarm Setup
+int alarmEnabled = FALSE;
+int alarmCount = 0;
+
+LinkLayer ll;
+
+
+// Alarm function handler
+void alarmHandler(int signal)
+{
+    alarmEnabled = FALSE;
+    alarmCount++;
+}
+
+
+
+////////////////////////////////////////////////
+// LLOPEN
+////////////////////////////////////////////////
+int llopen(LinkLayer connectionParameters)
+{
+
+    ll = connectionParameters;
+
+    fd = open(ll.serialPort, O_RDWR | O_NOCTTY);
+    if (fd < 0)
+    {
+        perror(ll.serialPort);
+        printf("Error: fd<0\n");
+        exit(-1);
+    }
+
+     // Save current port settings
     if (tcgetattr(fd, &oldtio) == -1)
     {
         perror("tcgetattr");
@@ -22,13 +68,14 @@ void setup(int baudrate, int timeout) {
     // Clear struct for new port settings
     memset(&newtio, 0, sizeof(newtio));
 
-    newtio.c_cflag = baudrate | CS8 | CLOCAL | CREAD;
+    newtio.c_cflag = (ll.baudRate) | CS8 | CLOCAL | CREAD; // tentar usar o baudRate do parametro
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
 
+
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 10*timeout; // Inter-character timer unused
+    newtio.c_cc[VTIME] = 10*ll.timeout; // Inter-character timer unused
     newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
 
     tcflush(fd, TCIOFLUSH);
@@ -37,31 +84,21 @@ void setup(int baudrate, int timeout) {
     if (tcsetattr(fd, TCSANOW, &newtio) == -1)
     {
         perror("tcsetattr");
-        exit(-1);
-    }
-}
 
-////////////////////////////////////////////////
-// LLOPEN
-////////////////////////////////////////////////
-int llopen(LinkLayer connectionParameters)
-{
-    fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
-    if (fd < 0)
-    {
-        perror(connectionParameters.serialPort);
         exit(-1);
     }
 
-    setup(connectionParameters.serialPort);
+    (void)signal(SIGALRM, alarmHandler);
 
-    switch(connectionParameters.role){
+    switch(ll.role){
         case LlTx:
             {
                 if(!openTransmitter()){
                     printf("Error: openTransmitter\n");
                     exit(1);
                 }
+
+                return 1;
             }
         case LlRx:
             {
@@ -69,11 +106,79 @@ int llopen(LinkLayer connectionParameters)
                     printf("Error: openReceiver\n");
                     exit(1);
                 }
+
+                return 1;
             }
         default:
             return 0;
 
     }
+
+    return 1;
+}
+
+int openTransmitter() {
+    alarmCount = 0;
+
+    while(alarmCount < ll.nRetransmissions){
+        alarm(ll.timeout);
+        alarmEnabled = TRUE;
+
+        if (alarmCount > 0)
+        {
+            alarmCount++;
+            printf("Alarm Count = %d\n", alarmCount);
+        }
+
+        buffer[0] = FLAG;
+        buffer[1] = A;
+        buffer[2] = C;
+        buffer[3] = (A^C);
+        buffer[4] = FLAG;
+        write(fd, buffer, 5);
+        
+        while(alarmEnabled && !(getState() == STOP)){
+            int bytes = read(fd, buffer, 5);
+
+            if(bytes < 0) return -1;
+
+            for (int i = 0; i<bytes; i++){
+                handleMsgByte(buffer[i]);
+            }
+            
+        }
+        if(getState() == STOP){
+                printf("Tudo perfeito do transmissor.\n");
+                break;
+        }
+    }
+
+
+    return 1;
+}
+
+int openReceiver() {
+    while(TRUE){
+        int bytes = read(fd, buffer, 5);
+
+        if(bytes < 0) return -1;
+
+        for (int i = 0; i<bytes; i++){
+            handleMsgByte(buffer[i]);
+        }
+
+        if(getState() == STOP){
+            printf("Tudo perfeito do recetor.\n");
+            break;
+        }
+    }
+    
+    buffer[0] = FLAG;
+    buffer[1] = A;
+    buffer[2] = UA;
+    buffer[3] = (A^UA);
+    buffer[4] = FLAG;
+    write(fd, buffer, 5);
 
     return 1;
 }

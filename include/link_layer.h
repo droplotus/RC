@@ -4,6 +4,8 @@
 #ifndef _LINK_LAYER_H_
 #define _LINK_LAYER_H_
 
+typedef unsigned char byte;
+
 typedef enum
 {
     LlTx,
@@ -17,6 +19,7 @@ typedef struct
     int baudRate;
     int nRetransmissions;
     int timeout;
+    int nTries;
 } LinkLayer;
 
 // SIZE of maximum acceptable payload.
@@ -46,6 +49,6 @@ int llclose(int showStatistics);
 
 int openTransmitter();
 int openReceiver();
-void setup(int fd, const char *porta);
+void setup(char *serialPort, int baudRate, int timeout);
 
 #endif // _LINK_LAYER_H_
