@@ -31,16 +31,20 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(1);
     }
 
+
     if(!strcmp(role, "tx")){
         if(!llwrite(filename)){
             printf("Error: llwrite\n");
             exit(1);
         }
-    } else {
+    } else if(!strcmp(role, "rx")){
         if(!llread()){
             printf("Error: llwrite\n");
             exit(1);
         }
+    } else {
+        printf("Error: rx|tx\n");
+        exit(1);
     }
 
     if(!llclose(1)){

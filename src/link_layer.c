@@ -164,10 +164,10 @@ int closeTransmitter() {
     alarmCount = 0;
     int receivedDISC = 0;
 
-    printf("Inside closeTransmitter\n");
+    //printf("Inside closeTransmitter\n");
 
     while(alarmCount < ll.nRetransmissions){
-        printf("Inside closeTransmitter -> while\n");
+        //printf("Inside closeTransmitter -> while\n");
         alarm(ll.timeout);
         alarmEnabled = TRUE;
 
@@ -185,14 +185,13 @@ int closeTransmitter() {
         write(fd, buf, 5);
 
         while(alarmEnabled && !receivedDISC){
-            printf("Inside closeTransmitter -> while -> while\n");
 
             int bytes = read(fd, buf, 5);
-            printf("Bytes: %d\n", bytes);
+
             if(bytes < 0) return -1;
 
             for (int i = 0; i<bytes; i++){
-                printf("State: %d\n", getState());
+                //printf("State: %d\n", getState());
                 handleMsgByte(buf[i]);
             }
 
@@ -201,7 +200,6 @@ int closeTransmitter() {
         }
 
         if(receivedDISC){
-            printf("Inside closeTransmitter -> while -> receivedDISC\n");
             buf[0] = FLAG;
             buf[1] = A;
             buf[2] = UA;
@@ -250,13 +248,9 @@ int closeReceiver() {
     int receivedDISC = 0;
     int receivedUA = 0;
 
-    printf("Inside closeReceiver\n");
-
     while(alarmCount < ll.nRetransmissions){
         alarm(ll.timeout);
         alarmEnabled = TRUE;
-
-        printf("Inside closeReceiver -> while\n");
 
         if (alarmCount > 0)
         {
@@ -265,22 +259,17 @@ int closeReceiver() {
         }
 
         while(alarmEnabled && !receivedDISC){
-            printf("Inside closeReceiver -> while -> while\n");
-
             int bytes = read(fd, buf, 5);
-            printf("Bytes: %d\n", bytes);
 
             if(bytes < 0) return -1;
 
             for (int i = 0; i<bytes; i++){
-                printf("%d\n", getState());
                 handleMsgByte(buf[i]);
             }
 
             if(getC() == DISC) receivedDISC = 1;
             
         }
-
 
         buf[0] = FLAG;
         buf[1] = A;
@@ -312,54 +301,51 @@ int closeReceiver() {
     return 1;
 }
 
-void sendPacket(unsigned char *buf) {
+void sendPacket(unsigned char *buf, int filelen) {
     
-    write(fd, buf, 1000);
+    write(fd, buf, filelen);
 
 }
 
 void sendFile(const char *filename) {
     FILE *fileptr;
     long filelen;
-    unsigned char *buffer;
+    unsigned char *buf;
     unsigned char *send;
 
     unsigned int index = 0;
 
-    //char *path = "../";
-    //strcat(path, filename);
-
     fileptr = fopen("../penguin.gif", "rb");
-    //printf("ganda lol");
+
     fseek(fileptr, 0, SEEK_END);          // Jump to the end of the file
     filelen = ftell(fileptr);             // Get the current byte offset in the file
     rewind(fileptr);
 
     printf("%li\n", filelen);
 
-    buffer = (unsigned char *)malloc((filelen+1) * sizeof(char));
-    fread(buffer, filelen, 1, fileptr); // Read in the entire file
+    buf = (unsigned char *)malloc(filelen * sizeof(char));
+    fread(buf, filelen, 1, fileptr); // Read in the entire file
     fclose(fileptr); // Close the file
 
     while(filelen > 0) {
         printf("file size: %ld\n", filelen);
-        if(filelen >= 1001){
-            send = (unsigned char *)malloc(1001 * sizeof(char));
+        if(filelen >= 1000){
+            send = (unsigned char *)malloc(1000 * sizeof(char));
             for(int i=0; i<1000; i++){
-                send[i] = buffer[i+index*1000];
+                send[i] = buf[i+index*1000];
             }
-            send[1000] = '\0';
-            sendPacket(send);
+
+            sendPacket(send, filelen);
             index++;
             filelen -= 1000;
         }
         else{
             send = (unsigned char *)malloc(filelen * sizeof(char));
             for(int i=0; i<filelen; i++){
-                send[i] = buffer[i+index*1000];
+                send[i] = buf[i+index*1000];
             }
             send[filelen] = '\0';
-            sendPacket(send);
+            sendPacket(send, filelen);
             filelen = 0;
             printf("finished sending file\n");
         }
@@ -400,7 +386,7 @@ int llread()
 {
     // int aux = 0;
     
-    unsigned char buffer[1000] = {0}; // +1: Save space for the final '\0' char
+    unsigned char buf[1000] = {0}; // +1: Save space for the final '\0' char
     
     FILE *fileptr;
     // int mode = O_WRONLY | O_APPEND | O_CREAT;
@@ -411,11 +397,11 @@ int llread()
     {
         //sleep(3);
         // Returns after 5 chars have been input
-        int bytes = read(fd, buffer, 1000);
+        int bytes = read(fd, buf, 1000);
         //printf("%d", bytes);
         //if(buffer[0] == 0x7E && buffer[1] == 0x03 && buffer[2] == 0x40 && buffer[3] == 0x03^0x40 && buffer[5] == 0x03^0x40 && buffer[6] == 0x7E)
         for(int i=0; i<bytes; i++)
-            fprintf(fileptr, "%c", buffer[i]);
+            fprintf(fileptr, "%c", buf[i]);
             
         
         if(bytes < 1000) break;
