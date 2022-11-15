@@ -77,8 +77,8 @@ int llopen(LinkLayer connectionParameters)
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 10*ll.timeout; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
+    newtio.c_cc[VTIME] = 3; // Inter-character timer unused
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     tcflush(fd, TCIOFLUSH);
 
@@ -340,8 +340,51 @@ unsigned char *createInformationFrame(unsigned char *buf, int filelen, int size)
     return buff;
 }
 
+int stuffing(unsigned char * buffer, int startingByte, int lenght, unsigned char * stuffedMessage) {
+    int messageSize = 0;
+
+    for (int i = 0; i < startingByte; i++)
+        stuffedMessage[messageSize++] = buffer[i];
+
+    for (int i = startingByte; i < lenght; i++) {
+        if (buffer[i] == FLAG || buffer[i] == 0x7d) {
+            stuffedMessage[messageSize++] = 0x7d;
+            stuffedMessage[messageSize++] = buffer[i] ^ 0x20;
+        }
+        else {
+            stuffedMessage[messageSize++] = buffer[i];
+        }
+    }
+
+    return messageSize;
+}
+
+int destuffing(unsigned char * buffer, int startingByte, int lenght, unsigned char * destuffedMessage) {
+    int messageSize = 0;
+
+    for (int i = 0; i < startingByte; i++) {
+        destuffedMessage[messageSize++] = buffer[i];
+    }
+
+    for (int i = startingByte; i < lenght; i++) {
+        if (buffer[i] == 0x7d) {
+            destuffedMessage[messageSize++] = buffer[i + 1] ^ 0x20;
+            i++;
+        }
+        else {
+            destuffedMessage[messageSize++] = buffer[i];
+        }
+    }
+
+    return messageSize;
+}
+
 void sendPacket(unsigned char *buf, int size) {
     //buf = createInformationFrame(buf, filelen, size);
+    //unsigned char stuffedData[size * 2];
+    //printf("before\n");
+    //stuffing(buf, 0, size, &stuffedData);
+    //printf("after\n");
     write(fd, buf, size);
 
 }
@@ -353,12 +396,14 @@ void sendFile(const char *filename) {
     unsigned char *send;
 
     unsigned int index = 0;
-
-    fileptr = fopen("../penguin.gif", "rb");
+    printf("1\n");
+    fileptr = fopen("penguin.gif", "rb");
 
     fseek(fileptr, 0, SEEK_END);          // Jump to the end of the file
     filelen = ftell(fileptr);             // Get the current byte offset in the file
     rewind(fileptr);
+
+    printf("2\n");
 
     printf("%li\n", filelen);
 
@@ -369,7 +414,7 @@ void sendFile(const char *filename) {
     fclose(fileptr); // Close the file
 
     rest = filelen%1000;
-
+    printf("3\n");
     while(filelen > 0) {
         printf("file size: %ld\n", filelen);
         if(filelen >= 1000){
@@ -377,8 +422,9 @@ void sendFile(const char *filename) {
             for(int i=0; i<1000; i++){
                 send[i] = buf[i+index*1000];
             }
-
+            printf("before sendPacket\n");
             sendPacket(send, 1000);
+            printf("after sendPacket\n");
             index++;
             filelen -= 1000;
         }
@@ -452,6 +498,9 @@ int llread()
 
         //if(buffer[0] == 0x7E && buffer[1] == 0x03 && buffer[2] == 0x40 && buffer[3] == 0x03^0x40 && buffer[5] == 0x03^0x40 && buffer[6] == 0x7E)
         
+        //unsigned char unstuffedData[1000];
+        //bytes = destuffing(bufferr, 0, 2000, &unstuffedData);
+
         for(int i=0; i<bytes; i++)
             fprintf(fileptr, "%c", bufferr[i]);
             

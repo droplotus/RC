@@ -53,6 +53,9 @@ int openReceiver();
 int closeTransmitter();
 int closeReceiver();
 
+int stuffing(unsigned char * buffer, int startingByte, int lenght, unsigned char * stuffedMessage);
+int destuffing(unsigned char * buffer, int startingByte, int lenght, unsigned char * destuffedMessage);
+
 unsigned char *createInformationFrame(unsigned char *buf, int filelen, int size);
 void sendPacket(unsigned char *buf, int size);
 void sendFile(const char *filename);
